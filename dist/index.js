@@ -20,6 +20,7 @@ function validateApiKey() {
   return apiKey;
 }
 async function callOpenAiApi(url, data, apiKey) {
+  var _a;
   try {
     const config = {
       headers: {
@@ -33,7 +34,7 @@ async function callOpenAiApi(url, data, apiKey) {
   } catch (error) {
     console.error("Error communicating with OpenAI API:", error instanceof Error ? error.message : String(error));
     if (axios.isAxiosError(error)) {
-      if (error.response?.status === 429) {
+      if (((_a = error.response) == null ? void 0 : _a.status) === 429) {
         throw new Error("Rate limit exceeded. Please try again later.");
       }
     }
@@ -55,7 +56,8 @@ var generateTextAction = {
   description: "Generate text using OpenAI",
   similes: [],
   async handler(_runtime, message, _state) {
-    const prompt = message.content.text?.trim() || "";
+    var _a;
+    const prompt = ((_a = message.content.text) == null ? void 0 : _a.trim()) || "";
     validatePrompt(prompt);
     const apiKey = validateApiKey();
     const requestData = buildRequestData(
@@ -83,7 +85,8 @@ var generateEmbeddingAction = {
   description: "Generate embeddings using OpenAI",
   similes: [],
   async handler(_runtime, message, _state) {
-    const input = message.content.text?.trim() || "";
+    var _a;
+    const input = ((_a = message.content.text) == null ? void 0 : _a.trim()) || "";
     validatePrompt(input);
     const apiKey = validateApiKey();
     const requestData = buildRequestData(
@@ -110,7 +113,8 @@ var analyzeSentimentAction = {
   similes: [],
   // Added missing required property
   async handler(_runtime, message, _state) {
-    const prompt = `Analyze the sentiment of the following text: "${message.content.text?.trim() || ""}"`;
+    var _a;
+    const prompt = `Analyze the sentiment of the following text: "${((_a = message.content.text) == null ? void 0 : _a.trim()) || ""}"`;
     validatePrompt(prompt);
     const apiKey = validateApiKey();
     const requestData = buildRequestData(prompt);
@@ -160,7 +164,8 @@ var moderateContentAction = {
   description: "Moderate content using OpenAI",
   similes: [],
   async handler(_runtime, message, _state) {
-    const input = message.content.text?.trim() || "";
+    var _a;
+    const input = ((_a = message.content.text) == null ? void 0 : _a.trim()) || "";
     validatePrompt(input);
     const apiKey = validateApiKey();
     const requestData = buildRequestData(
@@ -186,8 +191,9 @@ var editTextAction = {
   description: "Edit text using OpenAI",
   similes: [],
   async handler(_runtime, message, _state) {
-    const input = message.content.input?.trim() || "";
-    const instruction = message.content.instruction?.trim() || "";
+    var _a, _b;
+    const input = ((_a = message.content.input) == null ? void 0 : _a.trim()) || "";
+    const instruction = ((_b = message.content.instruction) == null ? void 0 : _b.trim()) || "";
     validatePrompt(input);
     validatePrompt(instruction);
     const apiKey = validateApiKey();
