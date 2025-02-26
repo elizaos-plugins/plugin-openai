@@ -28,5 +28,16 @@
     "scripts": {
         "build": "tsup src/index.ts --format esm --dts --tsconfig ./tsconfig.json",
         "dev": "tsup src/index.ts --format esm --dts --watch --tsconfig ./tsconfig.json"
+    },
+    "agentConfig": {
+        "pluginType": "elizaos:client:1.0.0",
+        "pluginParameters": {
+            "OPENAI_API_KEY": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The plugin requires the following environment variable: OPENAI_API_KEY=your_openai_api_key",
+                "optional": false
+            }
+        }
     }
 }
