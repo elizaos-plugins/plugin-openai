@@ -1,5 +1,4 @@
 import { createOpenAI } from '@ai-sdk/openai';
-import { getProviderBaseURL } from '@elizaos/core';
 import type {
   IAgentRuntime,
   ImageDescriptionParams,
@@ -123,7 +122,7 @@ function getSetting(
 function getBaseURL(runtime: IAgentRuntime): string {
   const defaultBaseURL = getSetting(runtime, 'OPENAI_BASE_URL', 'https://api.openai.com/v1');
   logger.debug(`[OpenAI] Default base URL: ${defaultBaseURL}`);
-  return getProviderBaseURL(runtime, 'openai', defaultBaseURL);
+  return defaultBaseURL;
 }
 
 /**
