@@ -1,6 +1,5 @@
 // src/index.ts
 import { createOpenAI } from "@ai-sdk/openai";
-import { getProviderBaseURL } from "@elizaos/core";
 import {
   EventType,
   logger,
@@ -17,13 +16,13 @@ import {
 import { encodingForModel } from "js-tiktoken";
 import { fetch, FormData } from "undici";
 
-// node_modules/@opentelemetry/api/build/esm/platform/node/globalThis.js
+// ../../node_modules/@opentelemetry/api/build/esm/platform/node/globalThis.js
 var _globalThis = typeof globalThis === "object" ? globalThis : global;
 
-// node_modules/@opentelemetry/api/build/esm/version.js
+// ../../node_modules/@opentelemetry/api/build/esm/version.js
 var VERSION = "1.9.0";
 
-// node_modules/@opentelemetry/api/build/esm/internal/semver.js
+// ../../node_modules/@opentelemetry/api/build/esm/internal/semver.js
 var re = /^(\d+)\.(\d+)\.(\d+)(-(.+))?$/;
 function _makeCompatibilityCheck(ownVersion) {
   var acceptedVersions = /* @__PURE__ */ new Set([ownVersion]);
@@ -90,7 +89,7 @@ function _makeCompatibilityCheck(ownVersion) {
 }
 var isCompatible = _makeCompatibilityCheck(VERSION);
 
-// node_modules/@opentelemetry/api/build/esm/internal/global-utils.js
+// ../../node_modules/@opentelemetry/api/build/esm/internal/global-utils.js
 var major = VERSION.split(".")[0];
 var GLOBAL_OPENTELEMETRY_API_KEY = Symbol.for("opentelemetry.js.api." + major);
 var _global = _globalThis;
@@ -132,7 +131,7 @@ function unregisterGlobal(type, diag) {
   }
 }
 
-// node_modules/@opentelemetry/api/build/esm/diag/ComponentLogger.js
+// ../../node_modules/@opentelemetry/api/build/esm/diag/ComponentLogger.js
 var __read = function(o, n) {
   var m = typeof Symbol === "function" && o[Symbol.iterator];
   if (!m) return o;
@@ -212,7 +211,7 @@ function logProxy(funcName, namespace, args) {
   return logger2[funcName].apply(logger2, __spreadArray([], __read(args), false));
 }
 
-// node_modules/@opentelemetry/api/build/esm/diag/types.js
+// ../../node_modules/@opentelemetry/api/build/esm/diag/types.js
 var DiagLogLevel;
 (function(DiagLogLevel2) {
   DiagLogLevel2[DiagLogLevel2["NONE"] = 0] = "NONE";
@@ -224,7 +223,7 @@ var DiagLogLevel;
   DiagLogLevel2[DiagLogLevel2["ALL"] = 9999] = "ALL";
 })(DiagLogLevel || (DiagLogLevel = {}));
 
-// node_modules/@opentelemetry/api/build/esm/diag/internal/logLevelLogger.js
+// ../../node_modules/@opentelemetry/api/build/esm/diag/internal/logLevelLogger.js
 function createLogLevelDiagLogger(maxLevel, logger2) {
   if (maxLevel < DiagLogLevel.NONE) {
     maxLevel = DiagLogLevel.NONE;
@@ -249,7 +248,7 @@ function createLogLevelDiagLogger(maxLevel, logger2) {
   };
 }
 
-// node_modules/@opentelemetry/api/build/esm/api/diag.js
+// ../../node_modules/@opentelemetry/api/build/esm/api/diag.js
 var __read2 = function(o, n) {
   var m = typeof Symbol === "function" && o[Symbol.iterator];
   if (!m) return o;
@@ -341,7 +340,7 @@ var DiagAPI = (
   }()
 );
 
-// node_modules/@opentelemetry/api/build/esm/context/context.js
+// ../../node_modules/@opentelemetry/api/build/esm/context/context.js
 var BaseContext = (
   /** @class */
   /* @__PURE__ */ function() {
@@ -367,7 +366,7 @@ var BaseContext = (
 );
 var ROOT_CONTEXT = new BaseContext();
 
-// node_modules/@opentelemetry/api/build/esm/context/NoopContextManager.js
+// ../../node_modules/@opentelemetry/api/build/esm/context/NoopContextManager.js
 var __read3 = function(o, n) {
   var m = typeof Symbol === "function" && o[Symbol.iterator];
   if (!m) return o;
@@ -422,7 +421,7 @@ var NoopContextManager = (
   }()
 );
 
-// node_modules/@opentelemetry/api/build/esm/api/context.js
+// ../../node_modules/@opentelemetry/api/build/esm/api/context.js
 var __read4 = function(o, n) {
   var m = typeof Symbol === "function" && o[Symbol.iterator];
   if (!m) return o;
@@ -490,7 +489,7 @@ var ContextAPI = (
   }()
 );
 
-// node_modules/@opentelemetry/api/build/esm/trace/status.js
+// ../../node_modules/@opentelemetry/api/build/esm/trace/status.js
 var SpanStatusCode;
 (function(SpanStatusCode2) {
   SpanStatusCode2[SpanStatusCode2["UNSET"] = 0] = "UNSET";
@@ -498,7 +497,7 @@ var SpanStatusCode;
   SpanStatusCode2[SpanStatusCode2["ERROR"] = 2] = "ERROR";
 })(SpanStatusCode || (SpanStatusCode = {}));
 
-// node_modules/@opentelemetry/api/build/esm/context-api.js
+// ../../node_modules/@opentelemetry/api/build/esm/context-api.js
 var context = ContextAPI.getInstance();
 
 // src/index.ts
@@ -560,9 +559,9 @@ function getSetting(runtime, key, defaultValue) {
   return runtime.getSetting(key) ?? process.env[key] ?? defaultValue;
 }
 function getBaseURL(runtime) {
-  const defaultBaseURL = getSetting(runtime, "OPENAI_BASE_URL", "https://api.openai.com/v1");
-  logger.debug(`[OpenAI] Default base URL: ${defaultBaseURL}`);
-  return getProviderBaseURL(runtime, "openai", defaultBaseURL);
+  const baseURL = getSetting(runtime, "OPENAI_BASE_URL", "https://api.openai.com/v1");
+  logger.debug(`[OpenAI] Default base URL: ${baseURL}`);
+  return baseURL;
 }
 function getEmbeddingBaseURL(runtime) {
   const embeddingURL = getSetting(runtime, "OPENAI_EMBEDDING_URL");
