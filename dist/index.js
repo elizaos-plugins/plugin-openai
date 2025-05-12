@@ -245,7 +245,22 @@ var openaiPlugin = {
     editTextAction
   ],
   evaluators: [],
-  providers: []
+  providers: [],
+  tests: [
+    {
+      name: "test-generateTextAction",
+      tests: [
+        {
+          name: "test-generateTextAction-1",
+          fn: async (runtime) => {
+            const result = "Empty OpenAI Plugin test!!";
+            console.log(result);
+            Promise.resolve(true);
+          }
+        }
+      ]
+    }
+  ]
 };
 var index_default = openaiPlugin;
 export {

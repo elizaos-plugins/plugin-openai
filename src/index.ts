@@ -36,6 +36,21 @@ export const openaiPlugin: Plugin = {
     ],
     evaluators: [],
     providers: [],
+    tests: [
+        {
+            name: "test-generateTextAction",
+            tests: [
+                {
+                    name: "test-generateTextAction-1",
+                    fn: async (runtime) => {
+                        const result = "Empty OpenAI Plugin test!!";
+                        console.log(result);
+                        Promise.resolve(true);
+                    },
+                },
+            ],
+        },
+    ],
 };
 
 export default openaiPlugin;
