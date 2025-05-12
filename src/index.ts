@@ -1,25 +1,25 @@
 import { createOpenAI } from '@ai-sdk/openai';
 import type {
+  DetokenizeTextParams,
+  GenerateTextParams,
   IAgentRuntime,
   ImageDescriptionParams,
   ModelTypeName,
   ObjectGenerationParams,
   Plugin,
-  ServiceTypeName,
   TextEmbeddingParams,
   TokenizeTextParams,
-  DetokenizeTextParams,
-  GenerateTextParams,
 } from '@elizaos/core';
 import {
   EventType,
   logger,
   ModelType,
-  VECTOR_DIMS,
   safeReplacer,
-  type InstrumentationService,
   ServiceType,
+  VECTOR_DIMS,
+  type InstrumentationService,
 } from '@elizaos/core';
+import { context, SpanStatusCode, type Span } from '@opentelemetry/api';
 import {
   generateObject,
   generateText,
@@ -27,9 +27,8 @@ import {
   type JSONValue,
   type LanguageModelUsage,
 } from 'ai';
-import { type TiktokenModel, encodingForModel } from 'js-tiktoken';
+import { encodingForModel, type TiktokenModel } from 'js-tiktoken';
 import { fetch, FormData } from 'undici';
-import { SpanStatusCode, trace, type Span, context } from '@opentelemetry/api';
 
 /**
  * Helper function to get tracer if instrumentation is enabled
