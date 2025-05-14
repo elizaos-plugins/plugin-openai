@@ -1,4 +1,4 @@
-import { createOpenAI } from '@ai-sdk/openai';
+import { createOpenAI } from "@ai-sdk/openai";
 import type {
   DetokenizeTextParams,
   GenerateTextParams,
@@ -9,7 +9,7 @@ import type {
   Plugin,
   TextEmbeddingParams,
   TokenizeTextParams,
-} from '@elizaos/core';
+} from "@elizaos/core";
 import {
   EventType,
   logger,
@@ -18,42 +18,50 @@ import {
   ServiceType,
   VECTOR_DIMS,
   type InstrumentationService,
-} from '@elizaos/core';
-import { context, SpanStatusCode, type Span } from '@opentelemetry/api';
+} from "@elizaos/core";
+import { context, SpanStatusCode, type Span } from "@opentelemetry/api";
 import {
   generateObject,
   generateText,
   JSONParseError,
   type JSONValue,
   type LanguageModelUsage,
-} from 'ai';
-import { encodingForModel, type TiktokenModel } from 'js-tiktoken';
-import { fetch, FormData } from 'undici';
+} from "ai";
+import { encodingForModel, type TiktokenModel } from "js-tiktoken";
+import { fetch, FormData } from "undici";
 
 /**
  * Helper function to get tracer if instrumentation is enabled
  */
 function getTracer(runtime: IAgentRuntime) {
   const availableServices = Array.from(runtime.getAllServices().keys());
-  logger.debug(`[getTracer] Available services: ${JSON.stringify(availableServices)}`);
-  logger.debug(`[getTracer] Attempting to get service with key: ${ServiceType.INSTRUMENTATION}`);
+  logger.debug(
+    `[getTracer] Available services: ${JSON.stringify(availableServices)}`
+  );
+  logger.debug(
+    `[getTracer] Attempting to get service with key: ${ServiceType.INSTRUMENTATION}`
+  );
 
   const instrumentationService = runtime.getService<InstrumentationService>(
     ServiceType.INSTRUMENTATION
   );
 
   if (!instrumentationService) {
-    logger.warn(`[getTracer] Service ${ServiceType.INSTRUMENTATION} not found in runtime.`);
+    logger.warn(
+      `[getTracer] Service ${ServiceType.INSTRUMENTATION} not found in runtime.`
+    );
     return null;
   }
 
   if (!instrumentationService.isEnabled()) {
-    logger.debug('[getTracer] Instrumentation service found but is disabled.');
+    logger.debug("[getTracer] Instrumentation service found but is disabled.");
     return null;
   }
 
-  logger.debug('[getTracer] Successfully retrieved enabled instrumentation service.');
-  return instrumentationService.getTracer('eliza.llm.openai');
+  logger.debug(
+    "[getTracer] Successfully retrieved enabled instrumentation service."
+  );
+  return instrumentationService.getTracer("eliza.llm.openai");
 }
 
 /**
@@ -62,7 +70,7 @@ function getTracer(runtime: IAgentRuntime) {
 async function startLlmSpan<T>(
   runtime: IAgentRuntime,
   spanName: string,
-  attributes: Record<string, string | number | boolean>,
+  attributes: Record<string, string | number | boolean | undefined>,
   fn: (span: Span) => Promise<T>
 ): Promise<T> {
   const tracer = getTracer(runtime);
@@ -74,7 +82,7 @@ async function startLlmSpan<T>(
       recordException: () => {},
       setStatus: () => {},
       end: () => {},
-      spanContext: () => ({ traceId: '', spanId: '', traceFlags: 0 }),
+      spanContext: () => ({ traceId: "", spanId: "", traceFlags: 0 }),
     } as unknown as Span;
     return fn(dummySpan);
   }
@@ -82,20 +90,25 @@ async function startLlmSpan<T>(
   // Get active context to ensure proper nesting
   const activeContext = context.active();
 
-  return tracer.startActiveSpan(spanName, { attributes }, activeContext, async (span: Span) => {
-    try {
-      const result = await fn(span);
-      span.setStatus({ code: SpanStatusCode.OK });
-      span.end();
-      return result;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      span.recordException(error as Error);
-      span.setStatus({ code: SpanStatusCode.ERROR, message });
-      span.end();
-      throw error;
+  return tracer.startActiveSpan(
+    spanName,
+    { attributes },
+    activeContext,
+    async (span: Span) => {
+      try {
+        const result = await fn(span);
+        span.setStatus({ code: SpanStatusCode.OK });
+        span.end();
+        return result;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        span.recordException(error as Error);
+        span.setStatus({ code: SpanStatusCode.ERROR, message });
+        span.end();
+        throw error;
+      }
     }
-  });
+  );
 }
 
 /**
@@ -119,7 +132,11 @@ function getSetting(
  * @returns The resolved base URL for OpenAI API requests.
  */
 function getBaseURL(runtime: IAgentRuntime): string {
-  const baseURL = getSetting(runtime, 'OPENAI_BASE_URL', 'https://api.openai.com/v1');
+  const baseURL = getSetting(
+    runtime,
+    "OPENAI_BASE_URL",
+    "https://api.openai.com/v1"
+  ) as string;
   logger.debug(`[OpenAI] Default base URL: ${baseURL}`);
   return baseURL;
 }
@@ -130,12 +147,12 @@ function getBaseURL(runtime: IAgentRuntime): string {
  * @returns The resolved base URL for OpenAI embedding requests.
  */
 function getEmbeddingBaseURL(runtime: IAgentRuntime): string {
-  const embeddingURL = getSetting(runtime, 'OPENAI_EMBEDDING_URL');
+  const embeddingURL = getSetting(runtime, "OPENAI_EMBEDDING_URL");
   if (embeddingURL) {
     logger.debug(`[OpenAI] Using specific embedding base URL: ${embeddingURL}`);
     return embeddingURL;
   }
-  logger.debug('[OpenAI] Falling back to general base URL for embeddings.');
+  logger.debug("[OpenAI] Falling back to general base URL for embeddings.");
   return getBaseURL(runtime);
 }
 
@@ -146,7 +163,7 @@ function getEmbeddingBaseURL(runtime: IAgentRuntime): string {
  * @returns The configured API key
  */
 function getApiKey(runtime: IAgentRuntime): string | undefined {
-  return getSetting(runtime, 'OPENAI_API_KEY');
+  return getSetting(runtime, "OPENAI_API_KEY");
 }
 
 /**
@@ -157,7 +174,8 @@ function getApiKey(runtime: IAgentRuntime): string | undefined {
  */
 function getSmallModel(runtime: IAgentRuntime): string {
   return (
-    getSetting(runtime, 'OPENAI_SMALL_MODEL') ?? getSetting(runtime, 'SMALL_MODEL', 'gpt-4o-mini')
+    getSetting(runtime, "OPENAI_SMALL_MODEL") ??
+    (getSetting(runtime, "SMALL_MODEL", "gpt-4o-mini") as string)
   );
 }
 
@@ -168,7 +186,10 @@ function getSmallModel(runtime: IAgentRuntime): string {
  * @returns The configured large model name
  */
 function getLargeModel(runtime: IAgentRuntime): string {
-  return getSetting(runtime, 'OPENAI_LARGE_MODEL') ?? getSetting(runtime, 'LARGE_MODEL', 'gpt-4o');
+  return (
+    getSetting(runtime, "OPENAI_LARGE_MODEL") ??
+    (getSetting(runtime, "LARGE_MODEL", "gpt-4o") as string)
+  );
 }
 
 /**
@@ -194,8 +215,10 @@ function createOpenAIClient(runtime: IAgentRuntime) {
 async function tokenizeText(model: ModelTypeName, prompt: string) {
   const modelName =
     model === ModelType.TEXT_SMALL
-      ? (process.env.OPENAI_SMALL_MODEL ?? process.env.SMALL_MODEL ?? 'gpt-4o-mini')
-      : (process.env.LARGE_MODEL ?? 'gpt-4o');
+      ? (process.env.OPENAI_SMALL_MODEL ??
+        process.env.SMALL_MODEL ??
+        "gpt-4o-mini")
+      : (process.env.LARGE_MODEL ?? "gpt-4o");
   const encoding = encodingForModel(modelName as TiktokenModel);
   const tokens = encoding.encode(prompt);
   return tokens;
@@ -211,8 +234,10 @@ async function tokenizeText(model: ModelTypeName, prompt: string) {
 async function detokenizeText(model: ModelTypeName, tokens: number[]) {
   const modelName =
     model === ModelType.TEXT_SMALL
-      ? (process.env.OPENAI_SMALL_MODEL ?? process.env.SMALL_MODEL ?? 'gpt-4o-mini')
-      : (process.env.OPENAI_LARGE_MODEL ?? process.env.LARGE_MODEL ?? 'gpt-4o');
+      ? (process.env.OPENAI_SMALL_MODEL ??
+        process.env.SMALL_MODEL ??
+        "gpt-4o-mini")
+      : (process.env.OPENAI_LARGE_MODEL ?? process.env.LARGE_MODEL ?? "gpt-4o");
   const encoding = encodingForModel(modelName as TiktokenModel);
   return encoding.decode(tokens);
 }
@@ -234,115 +259,133 @@ async function generateObjectByModelType(
 
   // --- Start Instrumentation ---
   const attributes = {
-    'llm.vendor': 'OpenAI',
-    'llm.request.type': 'object_generation',
-    'llm.request.model': modelName,
-    'llm.request.temperature': temperature,
-    'llm.request.schema_present': schemaPresent,
+    "llm.vendor": "OpenAI",
+    "llm.request.type": "object_generation",
+    "llm.request.model": modelName,
+    "llm.request.temperature": temperature,
+    "llm.request.schema_present": schemaPresent,
   };
 
-  return startLlmSpan(runtime, 'LLM.generateObject', attributes, async (span) => {
-    span.addEvent('llm.prompt', { 'prompt.content': params.prompt });
-    if (schemaPresent) {
-      span.addEvent('llm.request.schema', {
-        schema: JSON.stringify(params.schema, safeReplacer()),
-      });
-      logger.info(
-        `Using ${modelType} without schema validation (schema provided but output=no-schema)`
-      );
-    }
-
-    try {
-      const { object, usage } = await generateObject({
-        model: openai.languageModel(modelName),
-        output: 'no-schema',
-        prompt: params.prompt,
-        temperature: temperature,
-        experimental_repairText: getJsonRepairFunction(),
-      });
-
-      span.addEvent('llm.response.processed', {
-        'response.object': JSON.stringify(object, safeReplacer()),
-      });
-
-      if (usage) {
-        span.setAttributes({
-          'llm.usage.prompt_tokens': usage.promptTokens,
-          'llm.usage.completion_tokens': usage.completionTokens,
-          'llm.usage.total_tokens': usage.totalTokens,
+  return startLlmSpan(
+    runtime,
+    "LLM.generateObject",
+    attributes,
+    async (span) => {
+      span.addEvent("llm.prompt", { "prompt.content": params.prompt });
+      if (schemaPresent) {
+        span.addEvent("llm.request.schema", {
+          schema: JSON.stringify(params.schema, safeReplacer()),
         });
-        emitModelUsageEvent(runtime, modelType as ModelTypeName, params.prompt, usage);
+        logger.info(
+          `Using ${modelType} without schema validation (schema provided but output=no-schema)`
+        );
       }
-      return object;
-    } catch (error: unknown) {
-      if (error instanceof JSONParseError) {
-        logger.error(`[generateObject] Failed to parse JSON: ${error.message}`);
-        span.recordException(error);
-        span.addEvent('llm.error.json_parse', {
-          'error.message': error.message,
-          'error.text': error.text,
+
+      try {
+        const { object, usage } = await generateObject({
+          model: openai.languageModel(modelName),
+          output: "no-schema",
+          prompt: params.prompt,
+          temperature: temperature,
+          experimental_repairText: getJsonRepairFunction(),
         });
 
-        span.addEvent('llm.repair.attempt');
-        const repairFunction = getJsonRepairFunction();
-        const repairedJsonString = await repairFunction({
-          text: error.text,
-          error,
+        span.addEvent("llm.response.processed", {
+          "response.object": JSON.stringify(object, safeReplacer()),
         });
 
-        if (repairedJsonString) {
-          try {
-            const repairedObject = JSON.parse(repairedJsonString);
-            span.addEvent('llm.repair.success', {
-              repaired_object: JSON.stringify(repairedObject, safeReplacer()),
-            });
-            logger.info('[generateObject] Successfully repaired JSON.');
+        if (usage) {
+          span.setAttributes({
+            "llm.usage.prompt_tokens": usage.promptTokens,
+            "llm.usage.completion_tokens": usage.completionTokens,
+            "llm.usage.total_tokens": usage.totalTokens,
+          });
+          emitModelUsageEvent(
+            runtime,
+            modelType as ModelTypeName,
+            params.prompt,
+            usage
+          );
+        }
+        return object;
+      } catch (error: unknown) {
+        if (error instanceof JSONParseError) {
+          logger.error(
+            `[generateObject] Failed to parse JSON: ${error.message}`
+          );
+          span.recordException(error);
+          span.addEvent("llm.error.json_parse", {
+            "error.message": error.message,
+            "error.text": error.text,
+          });
+
+          span.addEvent("llm.repair.attempt");
+          const repairFunction = getJsonRepairFunction();
+          const repairedJsonString = await repairFunction({
+            text: error.text,
+            error,
+          });
+
+          if (repairedJsonString) {
+            try {
+              const repairedObject = JSON.parse(repairedJsonString);
+              span.addEvent("llm.repair.success", {
+                repaired_object: JSON.stringify(repairedObject, safeReplacer()),
+              });
+              logger.info("[generateObject] Successfully repaired JSON.");
+              span.setStatus({
+                code: SpanStatusCode.ERROR,
+                message: "JSON parsing failed but was repaired",
+              });
+              return repairedObject;
+            } catch (repairParseError: unknown) {
+              const message =
+                repairParseError instanceof Error
+                  ? repairParseError.message
+                  : String(repairParseError);
+              logger.error(
+                `[generateObject] Failed to parse repaired JSON: ${message}`
+              );
+              const exception =
+                repairParseError instanceof Error
+                  ? repairParseError
+                  : new Error(message);
+              span.recordException(exception);
+              span.addEvent("llm.repair.parse_error", {
+                "error.message": message,
+              });
+              span.setStatus({
+                code: SpanStatusCode.ERROR,
+                message: `JSON repair failed: ${message}`,
+              });
+              throw repairParseError;
+            }
+          } else {
+            const errMsg =
+              error instanceof Error ? error.message : String(error);
+            logger.error("[generateObject] JSON repair failed.");
+            span.addEvent("llm.repair.failed");
             span.setStatus({
               code: SpanStatusCode.ERROR,
-              message: 'JSON parsing failed but was repaired',
+              message: `JSON repair failed: ${errMsg}`,
             });
-            return repairedObject;
-          } catch (repairParseError: unknown) {
-            const message =
-              repairParseError instanceof Error
-                ? repairParseError.message
-                : String(repairParseError);
-            logger.error(`[generateObject] Failed to parse repaired JSON: ${message}`);
-            const exception =
-              repairParseError instanceof Error ? repairParseError : new Error(message);
-            span.recordException(exception);
-            span.addEvent('llm.repair.parse_error', {
-              'error.message': message,
-            });
-            span.setStatus({
-              code: SpanStatusCode.ERROR,
-              message: `JSON repair failed: ${message}`,
-            });
-            throw repairParseError;
+            throw error;
           }
         } else {
-          const errMsg = error instanceof Error ? error.message : String(error);
-          logger.error('[generateObject] JSON repair failed.');
-          span.addEvent('llm.repair.failed');
+          const message =
+            error instanceof Error ? error.message : String(error);
+          logger.error(`[generateObject] Unknown error: ${message}`);
+          const exception = error instanceof Error ? error : new Error(message);
+          span.recordException(exception);
           span.setStatus({
             code: SpanStatusCode.ERROR,
-            message: `JSON repair failed: ${errMsg}`,
+            message: message,
           });
           throw error;
         }
-      } else {
-        const message = error instanceof Error ? error.message : String(error);
-        logger.error(`[generateObject] Unknown error: ${message}`);
-        const exception = error instanceof Error ? error : new Error(message);
-        span.recordException(exception);
-        span.setStatus({
-          code: SpanStatusCode.ERROR,
-          message: message,
-        });
-        throw error;
       }
     }
-  });
+  );
 }
 
 /**
@@ -355,13 +398,14 @@ function getJsonRepairFunction(): (params: {
   return async ({ text, error }: { text: string; error: unknown }) => {
     try {
       if (error instanceof JSONParseError) {
-        const cleanedText = text.replace(/```json\n|\n```|```/g, '');
+        const cleanedText = text.replace(/```json\n|\n```|```/g, "");
         JSON.parse(cleanedText);
         return cleanedText;
       }
       return null;
     } catch (jsonError: unknown) {
-      const message = jsonError instanceof Error ? jsonError.message : String(jsonError);
+      const message =
+        jsonError instanceof Error ? jsonError.message : String(jsonError);
       logger.warn(`Failed to repair JSON text: ${message}`);
       return null;
     }
@@ -382,7 +426,7 @@ function emitModelUsageEvent(
   usage: LanguageModelUsage
 ) {
   runtime.emitEvent(EventType.MODEL_USED, {
-    provider: 'openai',
+    provider: "openai",
     type,
     prompt,
     tokens: {
@@ -398,17 +442,17 @@ function emitModelUsageEvent(
  */
 async function fetchTextToSpeech(runtime: IAgentRuntime, text: string) {
   const apiKey = getApiKey(runtime);
-  const model = getSetting(runtime, 'OPENAI_TTS_MODEL', 'gpt-4o-mini-tts');
-  const voice = getSetting(runtime, 'OPENAI_TTS_VOICE', 'nova');
-  const instructions = getSetting(runtime, 'OPENAI_TTS_INSTRUCTIONS', '');
+  const model = getSetting(runtime, "OPENAI_TTS_MODEL", "gpt-4o-mini-tts");
+  const voice = getSetting(runtime, "OPENAI_TTS_VOICE", "nova");
+  const instructions = getSetting(runtime, "OPENAI_TTS_INSTRUCTIONS", "");
   const baseURL = getBaseURL(runtime);
 
   try {
     const res = await fetch(`${baseURL}/audio/speech`, {
-      method: 'POST',
+      method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
         model,
@@ -435,8 +479,8 @@ async function fetchTextToSpeech(runtime: IAgentRuntime, text: string) {
  * @type {Plugin}
  */
 export const openaiPlugin: Plugin = {
-  name: 'openai',
-  description: 'OpenAI plugin',
+  name: "openai",
+  description: "OpenAI plugin",
   config: {
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
     OPENAI_BASE_URL: process.env.OPENAI_BASE_URL,
@@ -452,7 +496,7 @@ export const openaiPlugin: Plugin = {
     try {
       if (!getApiKey(runtime)) {
         logger.warn(
-          'OPENAI_API_KEY is not set in environment - OpenAI functionality will be limited'
+          "OPENAI_API_KEY is not set in environment - OpenAI functionality will be limited"
         );
         return;
       }
@@ -462,21 +506,29 @@ export const openaiPlugin: Plugin = {
           headers: { Authorization: `Bearer ${getApiKey(runtime)}` },
         });
         if (!response.ok) {
-          logger.warn(`OpenAI API key validation failed: ${response.statusText}`);
-          logger.warn('OpenAI functionality will be limited until a valid API key is provided');
+          logger.warn(
+            `OpenAI API key validation failed: ${response.statusText}`
+          );
+          logger.warn(
+            "OpenAI functionality will be limited until a valid API key is provided"
+          );
         } else {
-          logger.log('OpenAI API key validated successfully');
+          logger.log("OpenAI API key validated successfully");
         }
       } catch (fetchError: unknown) {
-        const message = fetchError instanceof Error ? fetchError.message : String(fetchError);
+        const message =
+          fetchError instanceof Error ? fetchError.message : String(fetchError);
         logger.warn(`Error validating OpenAI API key: ${message}`);
-        logger.warn('OpenAI functionality will be limited until a valid API key is provided');
+        logger.warn(
+          "OpenAI functionality will be limited until a valid API key is provided"
+        );
       }
     } catch (error: unknown) {
       const message =
         (error as { errors?: Array<{ message: string }> })?.errors
           ?.map((e) => e.message)
-          .join(', ') || (error instanceof Error ? error.message : String(error));
+          .join(", ") ||
+        (error instanceof Error ? error.message : String(error));
       logger.warn(
         `OpenAI plugin configuration issue: ${message} - You need to configure the OPENAI_API_KEY in your environment variables`
       );
@@ -489,11 +541,11 @@ export const openaiPlugin: Plugin = {
     ): Promise<number[]> => {
       const embeddingModelName = getSetting(
         runtime,
-        'OPENAI_EMBEDDING_MODEL',
-        'text-embedding-3-small'
+        "OPENAI_EMBEDDING_MODEL",
+        "text-embedding-3-small"
       );
       const embeddingDimension = Number.parseInt(
-        getSetting(runtime, 'OPENAI_EMBEDDING_DIMENSIONS', '1536') || '1536',
+        getSetting(runtime, "OPENAI_EMBEDDING_DIMENSIONS", "1536") || "1536",
         10
       ) as (typeof VECTOR_DIMS)[keyof typeof VECTOR_DIMS];
 
@@ -503,134 +555,151 @@ export const openaiPlugin: Plugin = {
       );
 
       if (!Object.values(VECTOR_DIMS).includes(embeddingDimension)) {
-        const errorMsg = `Invalid embedding dimension: ${embeddingDimension}. Must be one of: ${Object.values(VECTOR_DIMS).join(', ')}`;
+        const errorMsg = `Invalid embedding dimension: ${embeddingDimension}. Must be one of: ${Object.values(VECTOR_DIMS).join(", ")}`;
         logger.error(errorMsg);
         throw new Error(errorMsg);
       }
       if (params === null) {
-        logger.debug('Creating test embedding for initialization');
+        logger.debug("Creating test embedding for initialization");
         const testVector = Array(embeddingDimension).fill(0);
         testVector[0] = 0.1;
         return testVector;
       }
       let text: string;
-      if (typeof params === 'string') {
+      if (typeof params === "string") {
         text = params;
-      } else if (typeof params === 'object' && params.text) {
+      } else if (typeof params === "object" && params.text) {
         text = params.text;
       } else {
-        logger.warn('Invalid input format for embedding');
+        logger.warn("Invalid input format for embedding");
         const fallbackVector = Array(embeddingDimension).fill(0);
         fallbackVector[0] = 0.2;
         return fallbackVector;
       }
       if (!text.trim()) {
-        logger.warn('Empty text for embedding');
+        logger.warn("Empty text for embedding");
         const emptyVector = Array(embeddingDimension).fill(0);
         emptyVector[0] = 0.3;
         return emptyVector;
       }
 
       const attributes = {
-        'llm.vendor': 'OpenAI',
-        'llm.request.type': 'embedding',
-        'llm.request.model': embeddingModelName,
-        'llm.request.embedding.dimensions': embeddingDimension,
-        'input.text.length': text.length,
+        "llm.vendor": "OpenAI",
+        "llm.request.type": "embedding",
+        "llm.request.model": embeddingModelName,
+        "llm.request.embedding.dimensions": embeddingDimension,
+        "input.text.length": text.length,
       };
 
-      return startLlmSpan(runtime, 'LLM.embedding', attributes, async (span) => {
-        span.addEvent('llm.prompt', { 'prompt.content': text });
+      return startLlmSpan(
+        runtime,
+        "LLM.embedding",
+        attributes,
+        async (span) => {
+          span.addEvent("llm.prompt", { "prompt.content": text });
 
-        const embeddingBaseURL = getEmbeddingBaseURL(runtime);
-        const apiKey = getApiKey(runtime);
+          const embeddingBaseURL = getEmbeddingBaseURL(runtime);
+          const apiKey = getApiKey(runtime);
 
-        if (!apiKey) {
-          span.setStatus({
-            code: SpanStatusCode.ERROR,
-            message: 'OpenAI API key not configured',
-          });
-          throw new Error('OpenAI API key not configured');
-        }
-
-        try {
-          const response = await fetch(`${embeddingBaseURL}/embeddings`, {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${apiKey}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              model: embeddingModelName,
-              input: text,
-            }),
-          });
-
-          const responseClone = response.clone();
-          const rawResponseBody = await responseClone.text();
-          span.addEvent('llm.response.raw', {
-            'response.body': rawResponseBody,
-          });
-
-          if (!response.ok) {
-            logger.error(`OpenAI API error: ${response.status} - ${response.statusText}`);
-            span.setAttributes({ 'error.api.status': response.status });
+          if (!apiKey) {
             span.setStatus({
               code: SpanStatusCode.ERROR,
-              message: `OpenAI API error: ${response.status} - ${response.statusText}. Response: ${rawResponseBody}`,
+              message: "OpenAI API key not configured",
             });
-            const errorVector = Array(embeddingDimension).fill(0);
-            errorVector[0] = 0.4;
-            return errorVector;
+            throw new Error("OpenAI API key not configured");
           }
 
-          const data = (await response.json()) as {
-            data: [{ embedding: number[] }];
-            usage?: { prompt_tokens: number; total_tokens: number };
-          };
-
-          if (!data?.data?.[0]?.embedding) {
-            logger.error('API returned invalid structure');
-            span.setStatus({
-              code: SpanStatusCode.ERROR,
-              message: 'API returned invalid structure',
-            });
-            const errorVector = Array(embeddingDimension).fill(0);
-            errorVector[0] = 0.5;
-            return errorVector;
-          }
-
-          const embedding = data.data[0].embedding;
-          span.setAttribute('llm.response.embedding.vector_length', embedding.length);
-
-          if (data.usage) {
-            span.setAttributes({
-              'llm.usage.prompt_tokens': data.usage.prompt_tokens,
-              'llm.usage.total_tokens': data.usage.total_tokens,
+          try {
+            const response = await fetch(`${embeddingBaseURL}/embeddings`, {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${apiKey}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                model: embeddingModelName,
+                input: text,
+              }),
             });
 
-            const usage = {
-              promptTokens: data.usage.prompt_tokens,
-              completionTokens: 0,
-              totalTokens: data.usage.total_tokens,
+            const responseClone = response.clone();
+            const rawResponseBody = await responseClone.text();
+            span.addEvent("llm.response.raw", {
+              "response.body": rawResponseBody,
+            });
+
+            if (!response.ok) {
+              logger.error(
+                `OpenAI API error: ${response.status} - ${response.statusText}`
+              );
+              span.setAttributes({ "error.api.status": response.status });
+              span.setStatus({
+                code: SpanStatusCode.ERROR,
+                message: `OpenAI API error: ${response.status} - ${response.statusText}. Response: ${rawResponseBody}`,
+              });
+              const errorVector = Array(embeddingDimension).fill(0);
+              errorVector[0] = 0.4;
+              return errorVector;
+            }
+
+            const data = (await response.json()) as {
+              data: [{ embedding: number[] }];
+              usage?: { prompt_tokens: number; total_tokens: number };
             };
 
-            emitModelUsageEvent(runtime, ModelType.TEXT_EMBEDDING, text, usage);
-          }
+            if (!data?.data?.[0]?.embedding) {
+              logger.error("API returned invalid structure");
+              span.setStatus({
+                code: SpanStatusCode.ERROR,
+                message: "API returned invalid structure",
+              });
+              const errorVector = Array(embeddingDimension).fill(0);
+              errorVector[0] = 0.5;
+              return errorVector;
+            }
 
-          logger.log(`Got valid embedding with length ${embedding.length}`);
-          return embedding;
-        } catch (error: unknown) {
-          const message = error instanceof Error ? error.message : String(error);
-          logger.error(`Error generating embedding: ${message}`);
-          const exception = error instanceof Error ? error : new Error(message);
-          span.recordException(exception);
-          span.setStatus({ code: SpanStatusCode.ERROR, message: message });
-          const errorVector = Array(embeddingDimension).fill(0);
-          errorVector[0] = 0.6;
-          return errorVector;
+            const embedding = data.data[0].embedding;
+            span.setAttribute(
+              "llm.response.embedding.vector_length",
+              embedding.length
+            );
+
+            if (data.usage) {
+              span.setAttributes({
+                "llm.usage.prompt_tokens": data.usage.prompt_tokens,
+                "llm.usage.total_tokens": data.usage.total_tokens,
+              });
+
+              const usage = {
+                promptTokens: data.usage.prompt_tokens,
+                completionTokens: 0,
+                totalTokens: data.usage.total_tokens,
+              };
+
+              emitModelUsageEvent(
+                runtime,
+                ModelType.TEXT_EMBEDDING,
+                text,
+                usage
+              );
+            }
+
+            logger.log(`Got valid embedding with length ${embedding.length}`);
+            return embedding;
+          } catch (error: unknown) {
+            const message =
+              error instanceof Error ? error.message : String(error);
+            logger.error(`Error generating embedding: ${message}`);
+            const exception =
+              error instanceof Error ? error : new Error(message);
+            span.recordException(exception);
+            span.setStatus({ code: SpanStatusCode.ERROR, message: message });
+            const errorVector = Array(embeddingDimension).fill(0);
+            errorVector[0] = 0.6;
+            return errorVector;
+          }
         }
-      });
+      );
     },
     [ModelType.TEXT_TOKENIZER_ENCODE]: async (
       _runtime,
@@ -660,47 +729,56 @@ export const openaiPlugin: Plugin = {
       logger.log(prompt);
 
       const attributes = {
-        'llm.vendor': 'OpenAI',
-        'llm.request.type': 'completion',
-        'llm.request.model': modelName,
-        'llm.request.temperature': temperature,
-        'llm.request.max_tokens': max_response_length,
-        'llm.request.frequency_penalty': frequency_penalty,
-        'llm.request.presence_penalty': presence_penalty,
-        'llm.request.stop_sequences': JSON.stringify(stopSequences),
+        "llm.vendor": "OpenAI",
+        "llm.request.type": "completion",
+        "llm.request.model": modelName,
+        "llm.request.temperature": temperature,
+        "llm.request.max_tokens": max_response_length,
+        "llm.request.frequency_penalty": frequency_penalty,
+        "llm.request.presence_penalty": presence_penalty,
+        "llm.request.stop_sequences": JSON.stringify(stopSequences),
       };
 
-      return startLlmSpan(runtime, 'LLM.generateText', attributes, async (span) => {
-        span.addEvent('llm.prompt', { 'prompt.content': prompt });
+      return startLlmSpan(
+        runtime,
+        "LLM.generateText",
+        attributes,
+        async (span) => {
+          span.addEvent("llm.prompt", { "prompt.content": prompt });
 
-        const { text: openaiResponse, usage } = await generateText({
-          model: openai.languageModel(modelName),
-          prompt: prompt,
-          system: runtime.character.system ?? undefined,
-          temperature: temperature,
-          maxTokens: max_response_length,
-          frequencyPenalty: frequency_penalty,
-          presencePenalty: presence_penalty,
-          stopSequences: stopSequences,
-        });
-
-        span.setAttribute('llm.response.processed.length', openaiResponse.length);
-        span.addEvent('llm.response.processed', {
-          'response.content':
-            openaiResponse.substring(0, 200) + (openaiResponse.length > 200 ? '...' : ''),
-        });
-
-        if (usage) {
-          span.setAttributes({
-            'llm.usage.prompt_tokens': usage.promptTokens,
-            'llm.usage.completion_tokens': usage.completionTokens,
-            'llm.usage.total_tokens': usage.totalTokens,
+          const { text: openaiResponse, usage } = await generateText({
+            model: openai.languageModel(modelName),
+            prompt: prompt,
+            system: runtime.character.system ?? undefined,
+            temperature: temperature,
+            maxTokens: max_response_length,
+            frequencyPenalty: frequency_penalty,
+            presencePenalty: presence_penalty,
+            stopSequences: stopSequences,
           });
-          emitModelUsageEvent(runtime, ModelType.TEXT_SMALL, prompt, usage);
-        }
 
-        return openaiResponse;
-      });
+          span.setAttribute(
+            "llm.response.processed.length",
+            openaiResponse.length
+          );
+          span.addEvent("llm.response.processed", {
+            "response.content":
+              openaiResponse.substring(0, 200) +
+              (openaiResponse.length > 200 ? "..." : ""),
+          });
+
+          if (usage) {
+            span.setAttributes({
+              "llm.usage.prompt_tokens": usage.promptTokens,
+              "llm.usage.completion_tokens": usage.completionTokens,
+              "llm.usage.total_tokens": usage.totalTokens,
+            });
+            emitModelUsageEvent(runtime, ModelType.TEXT_SMALL, prompt, usage);
+          }
+
+          return openaiResponse;
+        }
+      );
     },
     [ModelType.TEXT_LARGE]: async (
       runtime: IAgentRuntime,
@@ -720,47 +798,56 @@ export const openaiPlugin: Plugin = {
       logger.log(prompt);
 
       const attributes = {
-        'llm.vendor': 'OpenAI',
-        'llm.request.type': 'completion',
-        'llm.request.model': modelName,
-        'llm.request.temperature': temperature,
-        'llm.request.max_tokens': maxTokens,
-        'llm.request.frequency_penalty': frequencyPenalty,
-        'llm.request.presence_penalty': presencePenalty,
-        'llm.request.stop_sequences': JSON.stringify(stopSequences),
+        "llm.vendor": "OpenAI",
+        "llm.request.type": "completion",
+        "llm.request.model": modelName,
+        "llm.request.temperature": temperature,
+        "llm.request.max_tokens": maxTokens,
+        "llm.request.frequency_penalty": frequencyPenalty,
+        "llm.request.presence_penalty": presencePenalty,
+        "llm.request.stop_sequences": JSON.stringify(stopSequences),
       };
 
-      return startLlmSpan(runtime, 'LLM.generateText', attributes, async (span) => {
-        span.addEvent('llm.prompt', { 'prompt.content': prompt });
+      return startLlmSpan(
+        runtime,
+        "LLM.generateText",
+        attributes,
+        async (span) => {
+          span.addEvent("llm.prompt", { "prompt.content": prompt });
 
-        const { text: openaiResponse, usage } = await generateText({
-          model: openai.languageModel(modelName),
-          prompt: prompt,
-          system: runtime.character.system ?? undefined,
-          temperature: temperature,
-          maxTokens: maxTokens,
-          frequencyPenalty: frequencyPenalty,
-          presencePenalty: presencePenalty,
-          stopSequences: stopSequences,
-        });
-
-        span.setAttribute('llm.response.processed.length', openaiResponse.length);
-        span.addEvent('llm.response.processed', {
-          'response.content':
-            openaiResponse.substring(0, 200) + (openaiResponse.length > 200 ? '...' : ''),
-        });
-
-        if (usage) {
-          span.setAttributes({
-            'llm.usage.prompt_tokens': usage.promptTokens,
-            'llm.usage.completion_tokens': usage.completionTokens,
-            'llm.usage.total_tokens': usage.totalTokens,
+          const { text: openaiResponse, usage } = await generateText({
+            model: openai.languageModel(modelName),
+            prompt: prompt,
+            system: runtime.character.system ?? undefined,
+            temperature: temperature,
+            maxTokens: maxTokens,
+            frequencyPenalty: frequencyPenalty,
+            presencePenalty: presencePenalty,
+            stopSequences: stopSequences,
           });
-          emitModelUsageEvent(runtime, ModelType.TEXT_LARGE, prompt, usage);
-        }
 
-        return openaiResponse;
-      });
+          span.setAttribute(
+            "llm.response.processed.length",
+            openaiResponse.length
+          );
+          span.addEvent("llm.response.processed", {
+            "response.content":
+              openaiResponse.substring(0, 200) +
+              (openaiResponse.length > 200 ? "..." : ""),
+          });
+
+          if (usage) {
+            span.setAttributes({
+              "llm.usage.prompt_tokens": usage.promptTokens,
+              "llm.usage.completion_tokens": usage.completionTokens,
+              "llm.usage.total_tokens": usage.totalTokens,
+            });
+            emitModelUsageEvent(runtime, ModelType.TEXT_LARGE, prompt, usage);
+          }
+
+          return openaiResponse;
+        }
+      );
     },
     [ModelType.IMAGE]: async (
       runtime: IAgentRuntime,
@@ -771,77 +858,86 @@ export const openaiPlugin: Plugin = {
       }
     ) => {
       const n = params.n || 1;
-      const size = params.size || '1024x1024';
+      const size = params.size || "1024x1024";
       const prompt = params.prompt;
-      const modelName = 'dall-e-3'; // Default DALL-E model
+      const modelName = "dall-e-3"; // Default DALL-E model
       logger.log(`[OpenAI] Using IMAGE model: ${modelName}`);
 
       const attributes = {
-        'llm.vendor': 'OpenAI',
-        'llm.request.type': 'image_generation',
-        'llm.request.image.size': size,
-        'llm.request.image.count': n,
+        "llm.vendor": "OpenAI",
+        "llm.request.type": "image_generation",
+        "llm.request.image.size": size,
+        "llm.request.image.count": n,
       };
 
-      return startLlmSpan(runtime, 'LLM.imageGeneration', attributes, async (span) => {
-        span.addEvent('llm.prompt', { 'prompt.content': prompt });
+      return startLlmSpan(
+        runtime,
+        "LLM.imageGeneration",
+        attributes,
+        async (span) => {
+          span.addEvent("llm.prompt", { "prompt.content": prompt });
 
-        const baseURL = getBaseURL(runtime);
-        const apiKey = getApiKey(runtime);
+          const baseURL = getBaseURL(runtime);
+          const apiKey = getApiKey(runtime);
 
-        if (!apiKey) {
-          span.setStatus({
-            code: SpanStatusCode.ERROR,
-            message: 'OpenAI API key not configured',
-          });
-          throw new Error('OpenAI API key not configured');
-        }
-
-        try {
-          const response = await fetch(`${baseURL}/images/generations`, {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${apiKey}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              prompt: prompt,
-              n: n,
-              size: size,
-            }),
-          });
-
-          const responseClone = response.clone();
-          const rawResponseBody = await responseClone.text();
-          span.addEvent('llm.response.raw', {
-            'response.body': rawResponseBody,
-          });
-
-          if (!response.ok) {
-            span.setAttributes({ 'error.api.status': response.status });
+          if (!apiKey) {
             span.setStatus({
               code: SpanStatusCode.ERROR,
-              message: `Failed to generate image: ${response.statusText}. Response: ${rawResponseBody}`,
+              message: "OpenAI API key not configured",
             });
-            throw new Error(`Failed to generate image: ${response.statusText}`);
+            throw new Error("OpenAI API key not configured");
           }
 
-          const data = await response.json();
-          const typedData = data as { data: { url: string }[] };
+          try {
+            const response = await fetch(`${baseURL}/images/generations`, {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${apiKey}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                prompt: prompt,
+                n: n,
+                size: size,
+              }),
+            });
 
-          span.addEvent('llm.response.processed', {
-            'response.urls': JSON.stringify(typedData.data),
-          });
+            const responseClone = response.clone();
+            const rawResponseBody = await responseClone.text();
+            span.addEvent("llm.response.raw", {
+              "response.body": rawResponseBody,
+            });
 
-          return typedData.data;
-        } catch (error: unknown) {
-          const message = error instanceof Error ? error.message : String(error);
-          const exception = error instanceof Error ? error : new Error(message);
-          span.recordException(exception);
-          span.setStatus({ code: SpanStatusCode.ERROR, message: message });
-          throw error;
+            if (!response.ok) {
+              span.setAttributes({ "error.api.status": response.status });
+              span.setStatus({
+                code: SpanStatusCode.ERROR,
+                message: `Failed to generate image: ${response.statusText}. Response: ${rawResponseBody}`,
+              });
+              throw new Error(
+                `Failed to generate image: ${response.statusText}`
+              );
+            }
+
+            const data = await response.json();
+            const typedData = data as { data: { url: string }[] };
+
+            span.addEvent("llm.response.processed", {
+              "response.urls": JSON.stringify(typedData.data),
+            });
+
+            return typedData.data;
+          } catch (error: unknown) {
+            const message =
+              error instanceof Error ? error.message : String(error);
+            const exception =
+              error instanceof Error ? error : new Error(message);
+            span.recordException(exception);
+            span.setStatus({ code: SpanStatusCode.ERROR, message: message });
+            throw error;
+          }
         }
-      });
+      );
     },
     [ModelType.IMAGE_DESCRIPTION]: async (
       runtime: IAgentRuntime,
@@ -849,262 +945,306 @@ export const openaiPlugin: Plugin = {
     ) => {
       let imageUrl: string;
       let promptText: string | undefined;
-      const modelName = 'gpt-4o-mini';
+      const modelName = "gpt-4o-mini";
       logger.log(`[OpenAI] Using IMAGE_DESCRIPTION model: ${modelName}`);
       const maxTokens = 300;
 
-      if (typeof params === 'string') {
+      if (typeof params === "string") {
         imageUrl = params;
-        promptText = 'Please analyze this image and provide a title and detailed description.';
+        promptText =
+          "Please analyze this image and provide a title and detailed description.";
       } else {
         imageUrl = params.imageUrl;
         promptText =
           params.prompt ||
-          'Please analyze this image and provide a title and detailed description.';
+          "Please analyze this image and provide a title and detailed description.";
       }
 
       const attributes = {
-        'llm.vendor': 'OpenAI',
-        'llm.request.type': 'chat',
-        'llm.request.model': modelName,
-        'llm.request.max_tokens': maxTokens,
-        'llm.request.image.url': imageUrl,
+        "llm.vendor": "OpenAI",
+        "llm.request.type": "chat",
+        "llm.request.model": modelName,
+        "llm.request.max_tokens": maxTokens,
+        "llm.request.image.url": imageUrl,
       };
 
       const messages = [
         {
-          role: 'user',
+          role: "user",
           content: [
-            { type: 'text', text: promptText },
-            { type: 'image_url', image_url: { url: imageUrl } },
+            { type: "text", text: promptText },
+            { type: "image_url", image_url: { url: imageUrl } },
           ],
         },
       ];
 
-      return startLlmSpan(runtime, 'LLM.imageDescription', attributes, async (span) => {
-        span.addEvent('llm.prompt', {
-          'prompt.content': JSON.stringify(messages, safeReplacer()),
-        });
-
-        const baseURL = getBaseURL(runtime);
-        const apiKey = getApiKey(runtime);
-
-        if (!apiKey) {
-          logger.error('OpenAI API key not set');
-          span.setStatus({
-            code: SpanStatusCode.ERROR,
-            message: 'OpenAI API key not configured',
-          });
-          return {
-            title: 'Failed to analyze image',
-            description: 'API key not configured',
-          };
-        }
-
-        try {
-          const response = await fetch(`${baseURL}/chat/completions`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${apiKey}`,
-            },
-            body: JSON.stringify({
-              model: modelName,
-              messages: messages,
-              max_tokens: maxTokens,
-            }),
+      return startLlmSpan(
+        runtime,
+        "LLM.imageDescription",
+        attributes,
+        async (span) => {
+          span.addEvent("llm.prompt", {
+            "prompt.content": JSON.stringify(messages, safeReplacer()),
           });
 
-          const responseClone = response.clone();
-          const rawResponseBody = await responseClone.text();
-          span.addEvent('llm.response.raw', {
-            'response.body': rawResponseBody,
-          });
+          const baseURL = getBaseURL(runtime);
+          const apiKey = getApiKey(runtime);
 
-          if (!response.ok) {
-            span.setAttributes({ 'error.api.status': response.status });
+          if (!apiKey) {
+            logger.error("OpenAI API key not set");
             span.setStatus({
               code: SpanStatusCode.ERROR,
-              message: `OpenAI API error: ${response.status}. Response: ${rawResponseBody}`,
-            });
-            throw new Error(`OpenAI API error: ${response.status}`);
-          }
-
-          const result: unknown = await response.json();
-
-          type OpenAIResponseType = {
-            choices?: Array<{
-              message?: { content?: string };
-              finish_reason?: string;
-            }>;
-            usage?: {
-              prompt_tokens: number;
-              completion_tokens: number;
-              total_tokens: number;
-            };
-          };
-
-          const typedResult = result as OpenAIResponseType;
-          const content = typedResult.choices?.[0]?.message?.content;
-
-          if (typedResult.usage) {
-            span.setAttributes({
-              'llm.usage.prompt_tokens': typedResult.usage.prompt_tokens,
-              'llm.usage.completion_tokens': typedResult.usage.completion_tokens,
-              'llm.usage.total_tokens': typedResult.usage.total_tokens,
-            });
-
-            emitModelUsageEvent(
-              runtime,
-              ModelType.IMAGE_DESCRIPTION,
-              typeof params === 'string' ? params : params.prompt || '',
-              {
-                promptTokens: typedResult.usage.prompt_tokens,
-                completionTokens: typedResult.usage.completion_tokens,
-                totalTokens: typedResult.usage.total_tokens,
-              }
-            );
-          }
-          if (typedResult.choices?.[0]?.finish_reason) {
-            span.setAttribute('llm.response.finish_reason', typedResult.choices[0].finish_reason);
-          }
-
-          if (!content) {
-            span.setStatus({
-              code: SpanStatusCode.ERROR,
-              message: 'No content in API response',
+              message: "OpenAI API key not configured",
             });
             return {
-              title: 'Failed to analyze image',
-              description: 'No response from API',
+              title: "Failed to analyze image",
+              description: "API key not configured",
             };
           }
 
-          const titleMatch = content.match(/title[:\s]+(.+?)(?:\n|$)/i);
-          const title = titleMatch?.[1]?.trim() || 'Image Analysis';
-          const description = content.replace(/title[:\s]+(.+?)(?:\n|$)/i, '').trim();
+          try {
+            const response = await fetch(`${baseURL}/chat/completions`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${apiKey}`,
+              },
+              body: JSON.stringify({
+                model: modelName,
+                messages: messages,
+                max_tokens: maxTokens,
+              }),
+            });
 
-          const processedResult = { title, description };
-          span.addEvent('llm.response.processed', {
-            'response.object': JSON.stringify(processedResult, safeReplacer()),
-          });
+            const responseClone = response.clone();
+            const rawResponseBody = await responseClone.text();
+            span.addEvent("llm.response.raw", {
+              "response.body": rawResponseBody,
+            });
 
-          return processedResult;
-        } catch (error: unknown) {
-          const message = error instanceof Error ? error.message : String(error);
-          logger.error(`Error analyzing image: ${message}`);
-          const exception = error instanceof Error ? error : new Error(message);
-          span.recordException(exception);
-          span.setStatus({ code: SpanStatusCode.ERROR, message: message });
-          return {
-            title: 'Failed to analyze image',
-            description: `Error: ${message}`,
-          };
+            if (!response.ok) {
+              span.setAttributes({ "error.api.status": response.status });
+              span.setStatus({
+                code: SpanStatusCode.ERROR,
+                message: `OpenAI API error: ${response.status}. Response: ${rawResponseBody}`,
+              });
+              throw new Error(`OpenAI API error: ${response.status}`);
+            }
+
+            const result: unknown = await response.json();
+
+            type OpenAIResponseType = {
+              choices?: Array<{
+                message?: { content?: string };
+                finish_reason?: string;
+              }>;
+              usage?: {
+                prompt_tokens: number;
+                completion_tokens: number;
+                total_tokens: number;
+              };
+            };
+
+            const typedResult = result as OpenAIResponseType;
+            const content = typedResult.choices?.[0]?.message?.content;
+
+            if (typedResult.usage) {
+              span.setAttributes({
+                "llm.usage.prompt_tokens": typedResult.usage.prompt_tokens,
+                "llm.usage.completion_tokens":
+                  typedResult.usage.completion_tokens,
+                "llm.usage.total_tokens": typedResult.usage.total_tokens,
+              });
+
+              emitModelUsageEvent(
+                runtime,
+                ModelType.IMAGE_DESCRIPTION,
+                typeof params === "string" ? params : params.prompt || "",
+                {
+                  promptTokens: typedResult.usage.prompt_tokens,
+                  completionTokens: typedResult.usage.completion_tokens,
+                  totalTokens: typedResult.usage.total_tokens,
+                }
+              );
+            }
+            if (typedResult.choices?.[0]?.finish_reason) {
+              span.setAttribute(
+                "llm.response.finish_reason",
+                typedResult.choices[0].finish_reason
+              );
+            }
+
+            if (!content) {
+              span.setStatus({
+                code: SpanStatusCode.ERROR,
+                message: "No content in API response",
+              });
+              return {
+                title: "Failed to analyze image",
+                description: "No response from API",
+              };
+            }
+
+            const titleMatch = content.match(/title[:\s]+(.+?)(?:\n|$)/i);
+            const title = titleMatch?.[1]?.trim() || "Image Analysis";
+            const description = content
+              .replace(/title[:\s]+(.+?)(?:\n|$)/i, "")
+              .trim();
+
+            const processedResult = { title, description };
+            span.addEvent("llm.response.processed", {
+              "response.object": JSON.stringify(
+                processedResult,
+                safeReplacer()
+              ),
+            });
+
+            return processedResult;
+          } catch (error: unknown) {
+            const message =
+              error instanceof Error ? error.message : String(error);
+            logger.error(`Error analyzing image: ${message}`);
+            const exception =
+              error instanceof Error ? error : new Error(message);
+            span.recordException(exception);
+            span.setStatus({ code: SpanStatusCode.ERROR, message: message });
+            return {
+              title: "Failed to analyze image",
+              description: `Error: ${message}`,
+            };
+          }
         }
-      });
+      );
     },
-    [ModelType.TRANSCRIPTION]: async (runtime: IAgentRuntime, audioBuffer: Buffer) => {
-      logger.log('audioBuffer', audioBuffer);
+    [ModelType.TRANSCRIPTION]: async (
+      runtime: IAgentRuntime,
+      audioBuffer: Buffer
+    ) => {
+      logger.log("audioBuffer", audioBuffer);
 
-      const modelName = 'whisper-1';
+      const modelName = "whisper-1";
       logger.log(`[OpenAI] Using TRANSCRIPTION model: ${modelName}`);
       const attributes = {
-        'llm.vendor': 'OpenAI',
-        'llm.request.type': 'transcription',
-        'llm.request.model': modelName,
-        'llm.request.audio.input_size_bytes': audioBuffer?.length || 0,
+        "llm.vendor": "OpenAI",
+        "llm.request.type": "transcription",
+        "llm.request.model": modelName,
+        "llm.request.audio.input_size_bytes": audioBuffer?.length || 0,
       };
 
-      return startLlmSpan(runtime, 'LLM.transcription', attributes, async (span) => {
-        span.addEvent('llm.prompt', {
-          'prompt.info': 'Audio buffer for transcription',
-        });
-
-        const baseURL = getBaseURL(runtime);
-        const apiKey = getApiKey(runtime);
-
-        if (!apiKey) {
-          span.setStatus({
-            code: SpanStatusCode.ERROR,
-            message: 'OpenAI API key not configured',
-          });
-          throw new Error('OpenAI API key not configured - Cannot make request');
-        }
-        if (!audioBuffer || audioBuffer.length === 0) {
-          span.setStatus({
-            code: SpanStatusCode.ERROR,
-            message: 'Audio buffer is empty or invalid',
-          });
-          throw new Error('Audio buffer is empty or invalid for transcription');
-        }
-
-        const formData = new FormData();
-        formData.append('file', new Blob([audioBuffer]), 'recording.mp3');
-        formData.append('model', 'whisper-1');
-
-        try {
-          const response = await fetch(`${baseURL}/audio/transcriptions`, {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${apiKey}`,
-            },
-            body: formData,
+      return startLlmSpan(
+        runtime,
+        "LLM.transcription",
+        attributes,
+        async (span) => {
+          span.addEvent("llm.prompt", {
+            "prompt.info": "Audio buffer for transcription",
           });
 
-          const responseClone = response.clone();
-          const rawResponseBody = await responseClone.text();
-          span.addEvent('llm.response.raw', {
-            'response.body': rawResponseBody,
-          });
+          const baseURL = getBaseURL(runtime);
+          const apiKey = getApiKey(runtime);
 
-          logger.log('response', response);
-
-          if (!response.ok) {
-            span.setAttributes({ 'error.api.status': response.status });
+          if (!apiKey) {
             span.setStatus({
               code: SpanStatusCode.ERROR,
-              message: `Failed to transcribe audio: ${response.statusText}. Response: ${rawResponseBody}`,
+              message: "OpenAI API key not configured",
             });
-            throw new Error(`Failed to transcribe audio: ${response.statusText}`);
+            throw new Error(
+              "OpenAI API key not configured - Cannot make request"
+            );
+          }
+          if (!audioBuffer || audioBuffer.length === 0) {
+            span.setStatus({
+              code: SpanStatusCode.ERROR,
+              message: "Audio buffer is empty or invalid",
+            });
+            throw new Error(
+              "Audio buffer is empty or invalid for transcription"
+            );
           }
 
-          const data = (await response.json()) as { text: string };
-          const processedText = data.text;
+          const formData = new FormData();
+          formData.append("file", new Blob([audioBuffer]), "recording.mp3");
+          formData.append("model", "whisper-1");
 
-          span.setAttribute('llm.response.processed.length', processedText.length);
-          span.addEvent('llm.response.processed', {
-            'response.text': processedText,
-          });
+          try {
+            const response = await fetch(`${baseURL}/audio/transcriptions`, {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${apiKey}`,
+              },
+              body: formData,
+            });
 
-          return processedText;
-        } catch (error: unknown) {
-          const message = error instanceof Error ? error.message : String(error);
-          const exception = error instanceof Error ? error : new Error(message);
-          span.recordException(exception);
-          span.setStatus({ code: SpanStatusCode.ERROR, message: message });
-          throw error;
+            const responseClone = response.clone();
+            const rawResponseBody = await responseClone.text();
+            span.addEvent("llm.response.raw", {
+              "response.body": rawResponseBody,
+            });
+
+            logger.log("response", response);
+
+            if (!response.ok) {
+              span.setAttributes({ "error.api.status": response.status });
+              span.setStatus({
+                code: SpanStatusCode.ERROR,
+                message: `Failed to transcribe audio: ${response.statusText}. Response: ${rawResponseBody}`,
+              });
+              throw new Error(
+                `Failed to transcribe audio: ${response.statusText}`
+              );
+            }
+
+            const data = (await response.json()) as { text: string };
+            const processedText = data.text;
+
+            span.setAttribute(
+              "llm.response.processed.length",
+              processedText.length
+            );
+            span.addEvent("llm.response.processed", {
+              "response.text": processedText,
+            });
+
+            return processedText;
+          } catch (error: unknown) {
+            const message =
+              error instanceof Error ? error.message : String(error);
+            const exception =
+              error instanceof Error ? error : new Error(message);
+            span.recordException(exception);
+            span.setStatus({ code: SpanStatusCode.ERROR, message: message });
+            throw error;
+          }
         }
-      });
+      );
     },
-    [ModelType.TEXT_TO_SPEECH]: async (runtime: IAgentRuntime, text: string) => {
-      const ttsModelName = getSetting(runtime, 'OPENAI_TTS_MODEL', 'gpt-4o-mini-tts');
+    [ModelType.TEXT_TO_SPEECH]: async (
+      runtime: IAgentRuntime,
+      text: string
+    ) => {
+      const ttsModelName = getSetting(
+        runtime,
+        "OPENAI_TTS_MODEL",
+        "gpt-4o-mini-tts"
+      );
       const attributes = {
-        'llm.vendor': 'OpenAI',
-        'llm.request.type': 'tts',
-        'llm.request.model': ttsModelName,
-        'input.text.length': text.length,
+        "llm.vendor": "OpenAI",
+        "llm.request.type": "tts",
+        "llm.request.model": ttsModelName,
+        "input.text.length": text.length,
       };
-      return startLlmSpan(runtime, 'LLM.tts', attributes, async (span) => {
+      return startLlmSpan(runtime, "LLM.tts", attributes, async (span) => {
         logger.log(`[OpenAI] Using TEXT_TO_SPEECH model: ${ttsModelName}`);
-        span.addEvent('llm.prompt', { 'prompt.content': text });
+        span.addEvent("llm.prompt", { "prompt.content": text });
         try {
           const speechStream = await fetchTextToSpeech(runtime, text);
-          span.addEvent('llm.response.success', {
-            info: 'Speech stream generated',
+          span.addEvent("llm.response.success", {
+            info: "Speech stream generated",
           });
           return speechStream;
         } catch (error: unknown) {
-          const message = error instanceof Error ? error.message : String(error);
+          const message =
+            error instanceof Error ? error.message : String(error);
           const exception = error instanceof Error ? error : new Error(message);
           span.recordException(exception);
           span.setStatus({ code: SpanStatusCode.ERROR, message: message });
@@ -1112,19 +1252,35 @@ export const openaiPlugin: Plugin = {
         }
       });
     },
-    [ModelType.OBJECT_SMALL]: async (runtime: IAgentRuntime, params: ObjectGenerationParams) => {
-      return generateObjectByModelType(runtime, params, ModelType.OBJECT_SMALL, getSmallModel);
+    [ModelType.OBJECT_SMALL]: async (
+      runtime: IAgentRuntime,
+      params: ObjectGenerationParams
+    ) => {
+      return generateObjectByModelType(
+        runtime,
+        params,
+        ModelType.OBJECT_SMALL,
+        getSmallModel
+      );
     },
-    [ModelType.OBJECT_LARGE]: async (runtime: IAgentRuntime, params: ObjectGenerationParams) => {
-      return generateObjectByModelType(runtime, params, ModelType.OBJECT_LARGE, getLargeModel);
+    [ModelType.OBJECT_LARGE]: async (
+      runtime: IAgentRuntime,
+      params: ObjectGenerationParams
+    ) => {
+      return generateObjectByModelType(
+        runtime,
+        params,
+        ModelType.OBJECT_LARGE,
+        getLargeModel
+      );
     },
   },
   tests: [
     {
-      name: 'openai_plugin_tests',
+      name: "openai_plugin_tests",
       tests: [
         {
-          name: 'openai_test_url_and_api_key_validation',
+          name: "openai_test_url_and_api_key_validation",
           fn: async (runtime: IAgentRuntime) => {
             const baseURL = getBaseURL(runtime);
             const response = await fetch(`${baseURL}/models`, {
@@ -1133,101 +1289,116 @@ export const openaiPlugin: Plugin = {
               },
             });
             const data = await response.json();
-            logger.log('Models Available:', (data as { data?: unknown[] })?.data?.length ?? 'N/A');
+            logger.log(
+              "Models Available:",
+              (data as { data?: unknown[] })?.data?.length ?? "N/A"
+            );
             if (!response.ok) {
-              throw new Error(`Failed to validate OpenAI API key: ${response.statusText}`);
+              throw new Error(
+                `Failed to validate OpenAI API key: ${response.statusText}`
+              );
             }
           },
         },
         {
-          name: 'openai_test_text_embedding',
+          name: "openai_test_text_embedding",
           fn: async (runtime: IAgentRuntime) => {
             try {
-              const embedding = await runtime.useModel(ModelType.TEXT_EMBEDDING, {
-                text: 'Hello, world!',
-              });
-              logger.log('embedding', embedding);
+              const embedding = await runtime.useModel(
+                ModelType.TEXT_EMBEDDING,
+                {
+                  text: "Hello, world!",
+                }
+              );
+              logger.log("embedding", embedding);
             } catch (error: unknown) {
-              const message = error instanceof Error ? error.message : String(error);
+              const message =
+                error instanceof Error ? error.message : String(error);
               logger.error(`Error in test_text_embedding: ${message}`);
               throw error;
             }
           },
         },
         {
-          name: 'openai_test_text_large',
+          name: "openai_test_text_large",
           fn: async (runtime: IAgentRuntime) => {
             try {
               const text = await runtime.useModel(ModelType.TEXT_LARGE, {
-                prompt: 'What is the nature of reality in 10 words?',
+                prompt: "What is the nature of reality in 10 words?",
               });
               if (text.length === 0) {
-                throw new Error('Failed to generate text');
+                throw new Error("Failed to generate text");
               }
-              logger.log('generated with test_text_large:', text);
+              logger.log("generated with test_text_large:", text);
             } catch (error: unknown) {
-              const message = error instanceof Error ? error.message : String(error);
+              const message =
+                error instanceof Error ? error.message : String(error);
               logger.error(`Error in test_text_large: ${message}`);
               throw error;
             }
           },
         },
         {
-          name: 'openai_test_text_small',
+          name: "openai_test_text_small",
           fn: async (runtime: IAgentRuntime) => {
             try {
               const text = await runtime.useModel(ModelType.TEXT_SMALL, {
-                prompt: 'What is the nature of reality in 10 words?',
+                prompt: "What is the nature of reality in 10 words?",
               });
               if (text.length === 0) {
-                throw new Error('Failed to generate text');
+                throw new Error("Failed to generate text");
               }
-              logger.log('generated with test_text_small:', text);
+              logger.log("generated with test_text_small:", text);
             } catch (error: unknown) {
-              const message = error instanceof Error ? error.message : String(error);
+              const message =
+                error instanceof Error ? error.message : String(error);
               logger.error(`Error in test_text_small: ${message}`);
               throw error;
             }
           },
         },
         {
-          name: 'openai_test_image_generation',
+          name: "openai_test_image_generation",
           fn: async (runtime: IAgentRuntime) => {
-            logger.log('openai_test_image_generation');
+            logger.log("openai_test_image_generation");
             try {
               const image = await runtime.useModel(ModelType.IMAGE, {
-                prompt: 'A beautiful sunset over a calm ocean',
+                prompt: "A beautiful sunset over a calm ocean",
                 n: 1,
-                size: '1024x1024',
+                size: "1024x1024",
               });
-              logger.log('generated with test_image_generation:', image);
+              logger.log("generated with test_image_generation:", image);
             } catch (error: unknown) {
-              const message = error instanceof Error ? error.message : String(error);
+              const message =
+                error instanceof Error ? error.message : String(error);
               logger.error(`Error in test_image_generation: ${message}`);
               throw error;
             }
           },
         },
         {
-          name: 'image-description',
+          name: "image-description",
           fn: async (runtime: IAgentRuntime) => {
             try {
-              logger.log('openai_test_image_description');
+              logger.log("openai_test_image_description");
               try {
                 const result = await runtime.useModel(
                   ModelType.IMAGE_DESCRIPTION,
-                  'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1c/Vitalik_Buterin_TechCrunch_London_2015_%28cropped%29.jpg/537px-Vitalik_Buterin_TechCrunch_London_2015_%28cropped%29.jpg'
+                  "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1c/Vitalik_Buterin_TechCrunch_London_2015_%28cropped%29.jpg/537px-Vitalik_Buterin_TechCrunch_London_2015_%28cropped%29.jpg"
                 );
 
                 if (
                   result &&
-                  typeof result === 'object' &&
-                  'title' in result &&
-                  'description' in result
+                  typeof result === "object" &&
+                  "title" in result &&
+                  "description" in result
                 ) {
-                  logger.log('Image description:', result);
+                  logger.log("Image description:", result);
                 } else {
-                  logger.error('Invalid image description result format:', result);
+                  logger.error(
+                    "Invalid image description result format:",
+                    result
+                  );
                 }
               } catch (e: unknown) {
                 const message = e instanceof Error ? e.message : String(e);
@@ -1235,68 +1406,83 @@ export const openaiPlugin: Plugin = {
               }
             } catch (e: unknown) {
               const message = e instanceof Error ? e.message : String(e);
-              logger.error(`Error in openai_test_image_description: ${message}`);
+              logger.error(
+                `Error in openai_test_image_description: ${message}`
+              );
             }
           },
         },
         {
-          name: 'openai_test_transcription',
+          name: "openai_test_transcription",
           fn: async (runtime: IAgentRuntime) => {
-            logger.log('openai_test_transcription');
+            logger.log("openai_test_transcription");
             try {
               const response = await fetch(
-                'https://upload.wikimedia.org/wikipedia/en/4/40/Chris_Benoit_Voice_Message.ogg'
+                "https://upload.wikimedia.org/wikipedia/en/4/40/Chris_Benoit_Voice_Message.ogg"
               );
               const arrayBuffer = await response.arrayBuffer();
               const transcription = await runtime.useModel(
                 ModelType.TRANSCRIPTION,
                 Buffer.from(new Uint8Array(arrayBuffer))
               );
-              logger.log('generated with test_transcription:', transcription);
+              logger.log("generated with test_transcription:", transcription);
             } catch (error: unknown) {
-              const message = error instanceof Error ? error.message : String(error);
+              const message =
+                error instanceof Error ? error.message : String(error);
               logger.error(`Error in test_transcription: ${message}`);
               throw error;
             }
           },
         },
         {
-          name: 'openai_test_text_tokenizer_encode',
+          name: "openai_test_text_tokenizer_encode",
           fn: async (runtime: IAgentRuntime) => {
-            const prompt = 'Hello tokenizer encode!';
-            const tokens = await runtime.useModel(ModelType.TEXT_TOKENIZER_ENCODE, { prompt });
+            const prompt = "Hello tokenizer encode!";
+            const tokens = await runtime.useModel(
+              ModelType.TEXT_TOKENIZER_ENCODE,
+              { prompt }
+            );
             if (!Array.isArray(tokens) || tokens.length === 0) {
-              throw new Error('Failed to tokenize text: expected non-empty array of tokens');
+              throw new Error(
+                "Failed to tokenize text: expected non-empty array of tokens"
+              );
             }
-            logger.log('Tokenized output:', tokens);
+            logger.log("Tokenized output:", tokens);
           },
         },
         {
-          name: 'openai_test_text_tokenizer_decode',
+          name: "openai_test_text_tokenizer_decode",
           fn: async (runtime: IAgentRuntime) => {
-            const prompt = 'Hello tokenizer decode!';
-            const tokens = await runtime.useModel(ModelType.TEXT_TOKENIZER_ENCODE, { prompt });
-            const decodedText = await runtime.useModel(ModelType.TEXT_TOKENIZER_DECODE, { tokens });
+            const prompt = "Hello tokenizer decode!";
+            const tokens = await runtime.useModel(
+              ModelType.TEXT_TOKENIZER_ENCODE,
+              { prompt }
+            );
+            const decodedText = await runtime.useModel(
+              ModelType.TEXT_TOKENIZER_DECODE,
+              { tokens }
+            );
             if (decodedText !== prompt) {
               throw new Error(
                 `Decoded text does not match original. Expected "${prompt}", got "${decodedText}"`
               );
             }
-            logger.log('Decoded text:', decodedText);
+            logger.log("Decoded text:", decodedText);
           },
         },
         {
-          name: 'openai_test_text_to_speech',
+          name: "openai_test_text_to_speech",
           fn: async (runtime: IAgentRuntime) => {
             try {
-              const text = 'Hello, this is a test for text-to-speech.';
+              const text = "Hello, this is a test for text-to-speech.";
               const response = await fetchTextToSpeech(runtime, text);
               if (!response) {
-                throw new Error('Failed to generate speech');
+                throw new Error("Failed to generate speech");
               }
-              logger.log('Generated speech successfully');
+              logger.log("Generated speech successfully");
             } catch (error: unknown) {
-              const message = error instanceof Error ? error.message : String(error);
+              const message =
+                error instanceof Error ? error.message : String(error);
               logger.error(`Error in openai_test_text_to_speech: ${message}`);
               throw error;
             }
