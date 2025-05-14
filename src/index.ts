@@ -193,6 +193,16 @@ function getLargeModel(runtime: IAgentRuntime): string {
 }
 
 /**
+ * Helper function to get the image description model name with fallbacks
+ *
+ * @param runtime The runtime context
+ * @returns The configured image description model name
+ */
+function getImageDescriptionModel(runtime: IAgentRuntime): string {
+  return getSetting(runtime, "OPENAI_IMAGE_DESCRIPTION_MODEL", "gpt-4o-mini") ?? "gpt-4o-mini";
+}
+
+/**
  * Create an OpenAI client with proper configuration
  *
  * @param runtime The runtime context
@@ -491,6 +501,8 @@ export const openaiPlugin: Plugin = {
     OPENAI_EMBEDDING_MODEL: process.env.OPENAI_EMBEDDING_MODEL,
     OPENAI_EMBEDDING_URL: process.env.OPENAI_EMBEDDING_URL,
     OPENAI_EMBEDDING_DIMENSIONS: process.env.OPENAI_EMBEDDING_DIMENSIONS,
+    OPENAI_IMAGE_DESCRIPTION_MODEL: process.env.OPENAI_IMAGE_DESCRIPTION_MODEL,
+    OPENAI_IMAGE_DESCRIPTION_MAX_TOKENS: process.env.OPENAI_IMAGE_DESCRIPTION_MAX_TOKENS,
   },
   async init(_config, runtime) {
     try {
@@ -945,9 +957,12 @@ export const openaiPlugin: Plugin = {
     ) => {
       let imageUrl: string;
       let promptText: string | undefined;
-      const modelName = "gpt-4o-mini";
+      const modelName = getImageDescriptionModel(runtime);
       logger.log(`[OpenAI] Using IMAGE_DESCRIPTION model: ${modelName}`);
-      const maxTokens = 300;
+      const maxTokens = Number.parseInt(
+        getSetting(runtime, "OPENAI_IMAGE_DESCRIPTION_MAX_TOKENS", "8192") || "8192",
+        10
+      );
 
       if (typeof params === "string") {
         imageUrl = params;
@@ -1003,17 +1018,19 @@ export const openaiPlugin: Plugin = {
           }
 
           try {
+            const requestBody: Record<string, any> = {
+              model: modelName,
+              messages: messages,
+              max_tokens: maxTokens,
+            };
+
             const response = await fetch(`${baseURL}/chat/completions`, {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
                 Authorization: `Bearer ${apiKey}`,
               },
-              body: JSON.stringify({
-                model: modelName,
-                messages: messages,
-                max_tokens: maxTokens,
-              }),
+              body: JSON.stringify(requestBody),
             });
 
             const responseClone = response.clone();
