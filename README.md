@@ -22,7 +22,9 @@ The plugin requires these environment variables (can be set in .env file or char
   "OPENAI_LARGE_MODEL": "gpt-4o",
   "OPENAI_EMBEDDING_MODEL": "text-embedding-3-small",
   "OPENAI_EMBEDDING_URL": "optional_custom_endpoint",
-  "OPENAI_EMBEDDING_DIMENSIONS": "1536"
+  "OPENAI_EMBEDDING_DIMENSIONS": "1536",
+  "OPENAI_IMAGE_DESCRIPTION_MODEL": "gpt-4o-mini",
+  "OPENAI_IMAGE_DESCRIPTION_MAX_TOKENS": "8192"
 }
 ```
 
@@ -37,6 +39,8 @@ OPENAI_LARGE_MODEL=gpt-4o
 OPENAI_EMBEDDING_MODEL=text-embedding-3-small
 OPENAI_EMBEDDING_URL=optional_custom_endpoint
 OPENAI_EMBEDDING_DIMENSIONS=1536
+OPENAI_IMAGE_DESCRIPTION_MODEL=gpt-4o-mini
+OPENAI_IMAGE_DESCRIPTION_MAX_TOKENS=8192
 ```
 
 ### Configuration Options
@@ -48,6 +52,8 @@ OPENAI_EMBEDDING_DIMENSIONS=1536
 - `OPENAI_EMBEDDING_MODEL`: Defaults to text-embedding-3-small ("text-embedding-3-small")
 - `OPENAI_EMBEDDING_URL`: Custom embedding endpoint (defaults to `OPENAI_BASE_URL`)
 - `OPENAI_EMBEDDING_DIMENSIONS`: Defaults to 1536 (1536)
+- `OPENAI_IMAGE_DESCRIPTION_MODEL`: Model used for image description (default: "gpt-4o-mini")
+- `OPENAI_IMAGE_DESCRIPTION_MAX_TOKENS`: Maximum tokens for image descriptions (default: 8192)
 
 The plugin provides these model classes:
 
