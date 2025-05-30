@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - 1.x
-      - 0.x
   workflow_dispatch:
 
 jobs:
@@ -84,22 +83,13 @@ jobs:
         uses: oven-sh/setup-bun@v2
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: bun install
 
       - name: Build package
         run: bun run build
 
       - name: Publish to npm
-        run: |
-          # strip “refs/heads/” prefix
-          BRANCH=${GITHUB_REF#refs/heads/}
-          if [[ "$BRANCH" == "1.x" ]]; then
-            echo "Publishing to npm under the 'beta' tag"
-            bun publish --tag beta
-          else
-            echo "Publishing to npm under the 'latest' tag"
-            bun publish
-          fi
+        run: bun publish
         env:
           NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
 
