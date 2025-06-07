@@ -1,6 +1,6 @@
 {
   "name": "@elizaos/plugin-openai",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "type": "module",
   "main": "dist/index.js",
   "module": "dist/index.js",
@@ -47,6 +47,83 @@
       "OPENAI_API_KEY": {
         "type": "string",
         "description": "API key for the service"
+      },
+      "OPENAI_BASE_URL": {
+        "type": "string",
+        "description": "Custom OpenAI API endpoint",
+        "required": false,
+        "default": "https://api.openai.com/v1"
+      },
+      "OPENAI_SMALL_MODEL": {
+        "type": "string",
+        "description": "Model ID for small/fast text tasks",
+        "required": false,
+        "default": "gpt-4o-mini"
+      },
+      "OPENAI_LARGE_MODEL": {
+        "type": "string",
+        "description": "Model ID for large/complex text tasks",
+        "required": false,
+        "default": "gpt-4o"
+      },
+      "OPENAI_EMBEDDING_MODEL": {
+        "type": "string",
+        "description": "Model ID used for generating text embeddings",
+        "required": false,
+        "default": "text-embedding-3-small"
+      },
+      "OPENAI_EMBEDDING_URL": {
+        "type": "string",
+        "description": "Custom endpoint for embedding requests",
+        "required": false,
+        "default": "value of OPENAI_BASE_URL if not set"
+      },
+      "OPENAI_EMBEDDING_DIMENSIONS": {
+        "type": "number",
+        "description": "Number of dimensions for embedding vectors",
+        "required": false,
+        "default": 1536
+      },
+      "OPENAI_IMAGE_DESCRIPTION_MODEL": {
+        "type": "string",
+        "description": "Model ID used for image description tasks",
+        "required": false,
+        "default": "gpt-4o-mini"
+      },
+      "OPENAI_IMAGE_DESCRIPTION_MAX_TOKENS": {
+        "type": "number",
+        "description": "Maximum tokens allowed for image description responses",
+        "required": false,
+        "default": 8192
+      },
+      "SMALL_MODEL": {
+        "type": "string",
+        "description": "Generic fallback small model name if provider-specific variable is not set",
+        "required": false,
+        "default": "gpt-4o-mini"
+      },
+      "LARGE_MODEL": {
+        "type": "string",
+        "description": "Generic fallback large model name if provider-specific variable is not set",
+        "required": false,
+        "default": "gpt-4o"
+      },
+      "OPENAI_TTS_MODEL": {
+        "type": "string",
+        "description": "Model name to be used for text-to-speech requests",
+        "required": false,
+        "default": "gpt-4o-mini-tts"
+      },
+      "OPENAI_TTS_VOICE": {
+        "type": "string",
+        "description": "Voice preset to use with text-to-speech generation",
+        "required": false,
+        "default": "nova"
+      },
+      "OPENAI_TTS_INSTRUCTIONS": {
+        "type": "string",
+        "description": "Custom instructions or style prompts for text-to-speech output",
+        "required": false
       }
     }
   },
