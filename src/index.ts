@@ -150,6 +150,22 @@ function getApiKey(runtime: IAgentRuntime): string | undefined {
 }
 
 /**
+ * Helper function to get the embedding API key for OpenAI, falling back to the general API key if not set.
+ *
+ * @param runtime The runtime context
+ * @returns The configured API key
+ */
+function getEmbeddingApiKey(runtime: IAgentRuntime): string | undefined {
+  const embeddingApiKey = getSetting(runtime, 'OPENAI_EMBEDDING_API_KEY');
+  if (embeddingApiKey) {
+    logger.debug(`[OpenAI] Using specific embedding API key: ${embeddingApiKey}`);
+    return embeddingApiKey;
+  }
+  logger.debug('[OpenAI] Falling back to general API key for embeddings.');
+  return getApiKey(runtime);
+}
+
+/**
  * Helper function to get the small model name with fallbacks
  *
  * @param runtime The runtime context
@@ -459,6 +475,7 @@ export const openaiPlugin: Plugin = {
     SMALL_MODEL: process.env.SMALL_MODEL,
     LARGE_MODEL: process.env.LARGE_MODEL,
     OPENAI_EMBEDDING_MODEL: process.env.OPENAI_EMBEDDING_MODEL,
+    OPENAI_EMBEDDING_API_KEY: process.env.OPENAI_EMBEDDING_API_KEY,
     OPENAI_EMBEDDING_URL: process.env.OPENAI_EMBEDDING_URL,
     OPENAI_EMBEDDING_DIMENSIONS: process.env.OPENAI_EMBEDDING_DIMENSIONS,
     OPENAI_IMAGE_DESCRIPTION_MODEL: process.env.OPENAI_IMAGE_DESCRIPTION_MODEL,
@@ -559,7 +576,7 @@ export const openaiPlugin: Plugin = {
         span.addEvent('llm.prompt', { 'prompt.content': text });
 
         const embeddingBaseURL = getEmbeddingBaseURL(runtime);
-        const apiKey = getApiKey(runtime);
+        const apiKey = getEmbeddingApiKey(runtime);
 
         if (!apiKey) {
           span.setStatus({
