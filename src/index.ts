@@ -438,16 +438,12 @@ export const openaiPlugin: Plugin = {
       }
 
       const embeddingBaseURL = getEmbeddingBaseURL(runtime);
-      const apiKey = getApiKey(runtime);
+      const apiKey = getEmbeddingApiKey(runtime);
 
       if (!apiKey) {
         throw new Error('OpenAI API key not configured');
       }
 
-<<<<<<< HEAD
-        const embeddingBaseURL = getEmbeddingBaseURL(runtime);
-        const apiKey = getEmbeddingApiKey(runtime);
-=======
       try {
         const response = await fetch(`${embeddingBaseURL}/embeddings`, {
           method: 'POST',
@@ -460,7 +456,6 @@ export const openaiPlugin: Plugin = {
             input: text,
           }),
         });
->>>>>>> 722f9509bb296ad249a2372fd6631ed202965854
 
         const responseClone = response.clone();
         const rawResponseBody = await responseClone.text();
