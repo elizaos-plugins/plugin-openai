@@ -100,7 +100,7 @@
         "type": "string",
         "description": "Custom API key for the OpenAI embeddings endpoint.",
         "required": false,
-        "sensitive": false
+        "sensitive": true
       },
       "OPENAI_EMBEDDING_DIMENSIONS": {
         "type": "number",
