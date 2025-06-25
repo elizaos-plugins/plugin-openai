@@ -96,6 +96,12 @@
         "required": false,
         "sensitive": false
       },
+      "OPENAI_EMBEDDING_API_KEY": {
+        "type": "string",
+        "description": "Custom API key for the OpenAI embeddings endpoint.",
+        "required": false,
+        "sensitive": true
+      },
       "OPENAI_EMBEDDING_DIMENSIONS": {
         "type": "number",
         "description": "Number of dimensions for the returned embedding vectors.",
