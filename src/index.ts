@@ -718,8 +718,6 @@ export const openaiPlugin: Plugin = {
         const typedResult = result as OpenAIResponseType;
         const content = typedResult.choices?.[0]?.message?.content;
 
-        console.log('############## CONTENT', content);
-
         if (typedResult.usage) {
           emitModelUsageEvent(
             runtime,
@@ -739,8 +737,6 @@ export const openaiPlugin: Plugin = {
             description: 'No response from API',
           };
         }
-
-        console.log('######################## CONTENT', content);
 
         // Check if a custom prompt was provided (not the default prompt)
         const isCustomPrompt =
