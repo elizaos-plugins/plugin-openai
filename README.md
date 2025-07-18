@@ -25,7 +25,8 @@ The plugin requires these environment variables (can be set in .env file or char
   "OPENAI_EMBEDDING_URL": "optional_custom_endpoint",
   "OPENAI_EMBEDDING_DIMENSIONS": "1536",
   "OPENAI_IMAGE_DESCRIPTION_MODEL": "gpt-4o-mini",
-  "OPENAI_IMAGE_DESCRIPTION_MAX_TOKENS": "8192"
+  "OPENAI_IMAGE_DESCRIPTION_MAX_TOKENS": "8192",
+  "OPENAI_EXPERIMENTAL_TELEMETRY": "false"
 }
 ```
 
@@ -43,6 +44,7 @@ OPENAI_EMBEDDING_URL=optional_custom_endpoint
 OPENAI_EMBEDDING_DIMENSIONS=1536
 OPENAI_IMAGE_DESCRIPTION_MODEL=gpt-4o-mini
 OPENAI_IMAGE_DESCRIPTION_MAX_TOKENS=8192
+OPENAI_EXPERIMENTAL_TELEMETRY=false
 ```
 
 ### Configuration Options
@@ -57,6 +59,18 @@ OPENAI_IMAGE_DESCRIPTION_MAX_TOKENS=8192
 - `OPENAI_EMBEDDING_DIMENSIONS`: Defaults to 1536 (1536)
 - `OPENAI_IMAGE_DESCRIPTION_MODEL`: Model used for image description (default: "gpt-4o-mini")
 - `OPENAI_IMAGE_DESCRIPTION_MAX_TOKENS`: Maximum tokens for image descriptions (default: 8192)
+- `OPENAI_EXPERIMENTAL_TELEMETRY`: Enable experimental telemetry features for enhanced debugging and usage analytics (default: false)
+
+### Experimental Telemetry
+
+When `OPENAI_EXPERIMENTAL_TELEMETRY` is set to `true`, the plugin enables advanced telemetry features that provide:
+
+- Enhanced debugging capabilities for model performance issues
+- Detailed usage analytics for optimization
+- Better observability into OpenAI API interactions
+- Foundation for future monitoring and analytics features through Sentry or other frameworks
+
+**Note**: This feature is opt-in due to privacy considerations, as telemetry data may contain information about model usage patterns. Enable only when you need enhanced debugging or analytics capabilities.
 
 The plugin provides these model classes:
 
@@ -84,7 +98,10 @@ await runtime.useModel(ModelType.IMAGE, {
 ### Audio Transcription
 
 ```js
-const transcription = await runtime.useModel(ModelType.TRANSCRIPTION, audioBuffer);
+const transcription = await runtime.useModel(
+  ModelType.TRANSCRIPTION,
+  audioBuffer
+);
 ```
 
 ### Image Analysis
@@ -99,5 +116,8 @@ const { title, description } = await runtime.useModel(
 ### Text Embeddings
 
 ```js
-const embedding = await runtime.useModel(ModelType.TEXT_EMBEDDING, 'text to embed');
+const embedding = await runtime.useModel(
+  ModelType.TEXT_EMBEDDING,
+  'text to embed'
+);
 ```

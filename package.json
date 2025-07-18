@@ -1,6 +1,6 @@
 {
   "name": "@elizaos/plugin-openai",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "type": "module",
   "main": "dist/index.js",
   "module": "dist/index.js",
@@ -141,6 +141,13 @@
         "type": "string",
         "description": "Optional instructions to control the style or behavior of the text-to-speech request.",
         "required": false,
+        "sensitive": false
+      },
+      "OPENAI_EXPERIMENTAL_TELEMETRY": {
+        "type": "boolean",
+        "description": "Enable experimental telemetry features for enhanced debugging and usage analytics.",
+        "required": false,
+        "default": false,
         "sensitive": false
       }
     }
